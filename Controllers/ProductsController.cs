@@ -1,35 +1,58 @@
 using Microsoft.AspNetCore.Mvc;
+using Api.Services;
+using Api.Models;
 
-namespace MyFirstApi.Controllers;
+namespace Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/products")]
 public class ProductsController : ControllerBase
 {
-  [HttpGet]
-  public IActionResult GetAll()
+  private readonly ICosmosDbService _cosmosDbService;
+
+  public ProductsController(ICosmosDbService cosmosDbService)
   {
-    var products = new[]
-    {
-            new { Id = 1, Name = "Laptop", Price = 999.99 },
-            new { Id = 2, Name = "Mouse", Price = 29.99 }
-        };
+    _cosmosDbService = cosmosDbService;
+  }
+
+  [HttpGet]
+  public async Task<IActionResult> GetAll()
+  {
+    var products = await _cosmosDbService.GetAllProductsAsync();
     return Ok(products);
   }
 
   [HttpGet("{id}")]
-  public IActionResult GetById(int id)
+  public async Task<IActionResult> GetById(string id)
   {
-    var product = new { Id = id, Name = "Sample Product", Price = 49.99 };
+    var product = await _cosmosDbService.GetProductByIdAsync(id);
+    if (product == null)
+    {
+      return NotFound();
+    }
     return Ok(product);
   }
 
   [HttpPost]
-  public IActionResult Create([FromBody] Product product)
+  public async Task<IActionResult> Create([FromBody] Product product)
   {
-    // Add logic to save the product
-    return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
+    product.Id = Guid.NewGuid().ToString();
+    var createdProduct = await _cosmosDbService.CreateProductAsync(product);
+    return CreatedAtAction(nameof(GetById), new { id = createdProduct.Id }, createdProduct);
+  }
+
+  [HttpPut("{id}")]
+  public async Task<IActionResult> Update(string id, [FromBody] Product product)
+  {
+    product.Id = id;
+    var updatedProduct = await _cosmosDbService.UpdateProductAsync(id, product);
+    return Ok(updatedProduct);
+  }
+
+  [HttpDelete("{id}")]
+  public async Task<IActionResult> Delete(string id)
+  {
+    await _cosmosDbService.DeleteProductAsync(id);
+    return NoContent();
   }
 }
-
-public record Product(int Id, string Name, decimal Price);
