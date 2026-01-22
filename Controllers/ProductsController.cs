@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Api.Services;
 using Api.Models;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/products")]
+[Authorize] // Requires valid JWT token
 public class ProductsController : ControllerBase
 {
   private readonly ICosmosDbService _cosmosDbService;
@@ -13,6 +16,27 @@ public class ProductsController : ControllerBase
   public ProductsController(ICosmosDbService cosmosDbService)
   {
     _cosmosDbService = cosmosDbService;
+  }
+
+  [HttpGet("me")]
+  public IActionResult GetCurrentUser()
+  {
+    // Extract user information from JWT claims
+    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                 ?? User.FindFirst("oid")?.Value; // Object ID
+    var email = User.FindFirst(ClaimTypes.Email)?.Value
+                ?? User.FindFirst("emails")?.Value;
+    var displayName = User.FindFirst(ClaimTypes.Name)?.Value
+                      ?? User.FindFirst("name")?.Value;
+
+    return Ok(new
+    {
+      UserId = userId,
+      Email = email,
+      DisplayName = displayName,
+      IsAuthenticated = User.Identity?.IsAuthenticated ?? false,
+      Claims = User.Claims.Select(c => new { c.Type, c.Value })
+    });
   }
 
   [HttpGet]
