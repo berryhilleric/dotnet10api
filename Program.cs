@@ -25,7 +25,18 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+    .AddMicrosoftIdentityWebApi(options =>
+    {
+        builder.Configuration.Bind("AzureAd", options);
+
+        // Accept ClientId as valid audience (matches your JWT token's aud claim)
+        options.TokenValidationParameters.ValidAudiences = new[]
+        {
+            builder.Configuration["AzureAd:ClientId"],
+            $"api://{builder.Configuration["AzureAd:ClientId"]}"
+        };
+    },
+    options => { builder.Configuration.Bind("AzureAd", options); });
 
 // Add Authorization policies
 builder.Services.AddAuthorization(options =>
