@@ -14,26 +14,21 @@
 
 3. Create a secret named: `AZURE_CREDENTIALS`
 
-4. Paste this JSON as the value (copy the entire block):
+4. Get the Azure credentials by running this command in PowerShell:
 
-```json
-{
-  "clientId": "f280f90f-6003-4db2-8a68-917bca9e7cac",
-  "clientSecret": "QsN8Q~XQGQtQrLronqoJbfd_Waqxnps8-frd1bx4",
-  "subscriptionId": "02c42fff-434d-4832-ae32-0c443c8140c8",
-  "tenantId": "ba473e14-d5b0-458f-8560-86ee220d71b6",
-  "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
-  "resourceManagerEndpointUrl": "https://management.azure.com/",
-  "activeDirectoryGraphResourceId": "https://graph.windows.net/",
-  "sqlManagementEndpointUrl": "https://management.core.windows.net:8443/",
-  "galleryEndpointUrl": "https://gallery.azure.com/",
-  "managementEndpointUrl": "https://management.core.windows.net/"
-}
+```powershell
+az ad sp list --display-name "github-actions-api-deploy" --query "[0]" -o json
 ```
 
-5. Click **Add secret**
+Or retrieve the full credentials from your terminal output when you ran the `az ad sp create-for-rbac` command.
+
+5. Paste the JSON output as the secret value in GitHub
+
+6. Click **Add secret**
 
 ### 2. Commit and Push
+
+**Note:** The actual Azure credentials should NOT be committed to your repository. They should only be added as a GitHub Secret (step 1 above).
 
 ```bash
 git add .github/
