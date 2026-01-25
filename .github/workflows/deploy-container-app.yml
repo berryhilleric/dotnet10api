@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - "Api/**"
-      - ".github/workflows/deploy-container-app.yml"
+      - "**"
+      - "!**.md"
   workflow_dispatch:
 
 env:
@@ -34,8 +34,8 @@ jobs:
             --registry ${{ env.AZURE_CONTAINER_REGISTRY }} \
             --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --image ${{ env.IMAGE_NAME }}:latest \
-            --file Api/Dockerfile \
-            Api/
+            --file Dockerfile \
+            .
 
       - name: Deploy to Container Apps
         run: |
