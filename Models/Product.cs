@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 
 namespace Api.Models
 {
+
   public class Product
   {
     [JsonProperty("id")]
