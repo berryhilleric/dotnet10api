@@ -116,6 +116,9 @@ builder.Services.AddSingleton<ICosmosDbService>(sp =>
     return new CosmosDbService(cosmosClient, databaseName, containerName);
 });
 
+// Register BlobStorageService as a singleton
+builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
+
 // Configure CORS for React app
 // Add Cross-Origin Resource Sharing configuration
 builder.Services.AddCors(options =>

@@ -16,5 +16,8 @@ namespace Api.Models
 
     [JsonProperty("price")]
     public decimal Price { get; set; }
+
+    [JsonProperty("imageUrl")]
+    public string? ImageUrl { get; set; }
   }
 }
