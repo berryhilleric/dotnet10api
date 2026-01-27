@@ -8,6 +8,10 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 // Import Microsoft Identity Web for Azure AD integration
 using Microsoft.Identity.Web;
+// Import Entity Framework Core for database operations
+using Microsoft.EntityFrameworkCore;
+// Import the DbContext for database access
+using Api.Data;
 
 // Create a web application builder with command-line arguments
 var builder = WebApplication.CreateBuilder(args);
@@ -119,6 +123,22 @@ builder.Services.AddSingleton<ICosmosDbService>(sp =>
 // Register BlobStorageService as a singleton
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 
+// Configure Entity Framework Core with Cosmos DB
+// Register DbContext with Cosmos DB provider using existing configuration
+builder.Services.AddDbContext<ApiDbContext>(options =>
+{
+    if (!string.IsNullOrEmpty(connectionString))
+    {
+        // Use connection string for local development
+        options.UseCosmos(connectionString, databaseName);
+    }
+    else
+    {
+        // Use account endpoint and DefaultAzureCredential for production
+        options.UseCosmos(cosmosAccountEndpoint, new DefaultAzureCredential(), databaseName);
+    }
+});
+
 // Configure CORS for React app
 // Add Cross-Origin Resource Sharing configuration
 builder.Services.AddCors(options =>
@@ -144,6 +164,13 @@ builder.Services.AddCors(options =>
 
 // Build the web application from the configured builder
 var app = builder.Build();
+
+// Ensure Cosmos DB database and container exist (EF Core for Cosmos DB)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
+    await db.Database.EnsureCreatedAsync();
+}
 
 // Configure the HTTP request pipeline.
 // Enable Swagger in all environments for testing
