@@ -2,8 +2,6 @@
 using Api.Services;
 // Import Azure Identity library for authentication with Azure services
 using Azure.Identity;
-// Import Cosmos DB SDK for database operations
-using Microsoft.Azure.Cosmos;
 // Import JWT Bearer authentication for token-based auth
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 // Import Microsoft Identity Web for Azure AD integration
@@ -71,54 +69,10 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole("Admin"));
 });
 
-// Read Cosmos DB account endpoint from configuration, throw error if missing
+// Read Cosmos DB configuration for EF Core
 var cosmosAccountEndpoint = builder.Configuration["CosmosDb:AccountEndpoint"] ?? throw new InvalidOperationException("CosmosDb:AccountEndpoint not configured");
-// Read Cosmos DB database name from configuration, throw error if missing
 var databaseName = builder.Configuration["CosmosDb:DatabaseName"] ?? throw new InvalidOperationException("CosmosDb:DatabaseName not configured");
-// Read Cosmos DB container name from configuration, throw error if missing
-var containerName = builder.Configuration["CosmosDb:ContainerName"] ?? throw new InvalidOperationException("CosmosDb:ContainerName not configured");
-// Read optional connection string from configuration (used for local development)
 var connectionString = builder.Configuration["CosmosDb:ConnectionString"];
-
-// Register CosmosClient as a singleton (one instance for the app lifetime)
-builder.Services.AddSingleton<CosmosClient>(sp =>
-{
-    // Create Cosmos DB client options with custom serialization settings
-    var cosmosClientOptions = new CosmosClientOptions
-    {
-        // Configure serializer options for JSON conversion
-        SerializerOptions = new CosmosSerializationOptions
-        {
-            // Use camelCase for property names (e.g., "firstName" instead of "FirstName")
-            PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
-        }
-    };
-
-    // Check if connection string is provided for local development
-    if (!string.IsNullOrEmpty(connectionString))
-    {
-        // Use connection string for local development
-        // Create client using connection string (less secure, for local dev only)
-        return new CosmosClient(connectionString, cosmosClientOptions);
-    }
-    else
-    {
-        // Use DefaultAzureCredential for production (Managed Identity)
-        // Create credential that uses Managed Identity in Azure
-        var credential = new DefaultAzureCredential();
-        // Create client using Azure credential (secure, for production)
-        return new CosmosClient(cosmosAccountEndpoint, credential, cosmosClientOptions);
-    }
-});
-
-// Register CosmosDbService as a singleton
-builder.Services.AddSingleton<ICosmosDbService>(sp =>
-{
-    // Get the CosmosClient instance from dependency injection
-    var cosmosClient = sp.GetRequiredService<CosmosClient>();
-    // Create and return CosmosDbService with client, database, and container names
-    return new CosmosDbService(cosmosClient, databaseName, containerName);
-});
 
 // Register BlobStorageService as a singleton
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
