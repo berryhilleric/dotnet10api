@@ -27,6 +27,9 @@ public class ApiDbContext : DbContext
       // Id is the key
       entity.HasKey(e => e.Id);
 
+      // Disable discriminator since existing data doesn't have it
+      entity.HasNoDiscriminator();
+
       // Configure properties (Cosmos DB handles types differently than SQL)
       entity.Property(e => e.Id).IsRequired();
       entity.Property(e => e.UserId).IsRequired();
