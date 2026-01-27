@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Api.Services;
 using Api.Models;
+using Api.Data;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
@@ -11,12 +13,12 @@ namespace Api.Controllers;
 [Authorize] // Requires valid JWT token
 public class ProductsController : ControllerBase
 {
-  private readonly ICosmosDbService _cosmosDbService;
+  private readonly ApiDbContext _context;
   private readonly IBlobStorageService _blobStorageService;
 
-  public ProductsController(ICosmosDbService cosmosDbService, IBlobStorageService blobStorageService)
+  public ProductsController(ApiDbContext context, IBlobStorageService blobStorageService)
   {
-    _cosmosDbService = cosmosDbService;
+    _context = context;
     _blobStorageService = blobStorageService;
   }
 
@@ -44,14 +46,25 @@ public class ProductsController : ControllerBase
   [HttpGet]
   public async Task<IActionResult> GetAll()
   {
-    var products = await _cosmosDbService.GetAllProductsAsync();
+    var products = await _context.Products.ToListAsync();
+    return Ok(products);
+  }
+
+  [HttpGet("{userId}")]
+  public async Task<IActionResult> GetByUserId(int userId)
+  {
+    var products = await _context.Products
+      .Where(p => p.UserId == userId)
+      .ToListAsync();
     return Ok(products);
   }
 
   [HttpGet("{userId}/{id}")]
   public async Task<IActionResult> GetById(int userId, string id)
   {
-    var product = await _cosmosDbService.GetProductByIdAsync(userId, id);
+    var product = await _context.Products
+      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+
     if (product == null)
     {
       return NotFound();
@@ -63,23 +76,48 @@ public class ProductsController : ControllerBase
   public async Task<IActionResult> Create([FromBody] Product product)
   {
     product.Id = Guid.NewGuid().ToString();
-    var createdProduct = await _cosmosDbService.CreateProductAsync(product);
-    return CreatedAtAction(nameof(GetById), new { id = createdProduct.Id }, createdProduct);
+
+    _context.Products.Add(product);
+    await _context.SaveChangesAsync();
+
+    return CreatedAtAction(nameof(GetById), new { userId = product.UserId, id = product.Id }, product);
   }
 
   [HttpPut("{userId}/{id}")]
   public async Task<IActionResult> Update(int userId, string id, [FromBody] Product product)
   {
-    product.Id = id;
-    product.UserId = userId;
-    var updatedProduct = await _cosmosDbService.UpdateProductAsync(id, product);
-    return Ok(updatedProduct);
+    var existingProduct = await _context.Products
+      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+
+    if (existingProduct == null)
+    {
+      return NotFound();
+    }
+
+    // Update properties
+    existingProduct.Name = product.Name;
+    existingProduct.Price = product.Price;
+    existingProduct.ImageUrl = product.ImageUrl;
+
+    await _context.SaveChangesAsync();
+
+    return Ok(existingProduct);
   }
 
   [HttpDelete("{userId}/{id}")]
   public async Task<IActionResult> Delete(int userId, string id)
   {
-    await _cosmosDbService.DeleteProductAsync(userId, id);
+    var product = await _context.Products
+      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+
+    if (product == null)
+    {
+      return NotFound();
+    }
+
+    _context.Products.Remove(product);
+    await _context.SaveChangesAsync();
+
     return NoContent();
   }
 
@@ -105,7 +143,9 @@ public class ProductsController : ControllerBase
     }
 
     // Get the product
-    var product = await _cosmosDbService.GetProductByIdAsync(userId, id);
+    var product = await _context.Products
+      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+
     if (product == null)
     {
       return NotFound("Product not found");
@@ -123,7 +163,7 @@ public class ProductsController : ControllerBase
 
     // Update product with new image URL
     product.ImageUrl = imageUrl;
-    await _cosmosDbService.UpdateProductAsync(id, product);
+    await _context.SaveChangesAsync();
 
     return Ok(new { imageUrl });
   }
@@ -131,7 +171,9 @@ public class ProductsController : ControllerBase
   [HttpDelete("{userId}/{id}/image")]
   public async Task<IActionResult> DeleteImage(int userId, string id)
   {
-    var product = await _cosmosDbService.GetProductByIdAsync(userId, id);
+    var product = await _context.Products
+      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+
     if (product == null)
     {
       return NotFound("Product not found");
@@ -141,7 +183,7 @@ public class ProductsController : ControllerBase
     {
       await _blobStorageService.DeleteImageAsync(product.ImageUrl);
       product.ImageUrl = null;
-      await _cosmosDbService.UpdateProductAsync(id, product);
+      await _context.SaveChangesAsync();
     }
 
     return NoContent();
