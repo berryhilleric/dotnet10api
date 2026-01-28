@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy csproj and restore dependencies
-COPY Api.csproj .
+COPY Products.csproj .
 RUN dotnet restore
 
 # Copy everything else and build
@@ -24,4 +24,4 @@ EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
 
 # Run the app
-ENTRYPOINT ["dotnet", "Api.dll"]
+ENTRYPOINT ["dotnet", "Products.dll"]
