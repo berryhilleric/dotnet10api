@@ -2,7 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Identity;
 
-namespace Api.Services
+namespace Products.Services
 {
   public interface IBlobStorageService
   {

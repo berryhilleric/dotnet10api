@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
-using Api.Services;
-using Api.Models;
-using Api.Data;
+using Products.Services;
+using Products.Models;
+using Products.Models.DTOs;
+using Products.Data;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using Products.Mappers;
 
-namespace Api.Controllers;
+namespace Products.Controllers;
 
 [ApiController]
 [Route("api/products")]
@@ -15,11 +17,16 @@ public class ProductsController : ControllerBase
 {
   private readonly ApiDbContext _context;
   private readonly IBlobStorageService _blobStorageService;
+  private readonly IProductMapper _mapper;
 
-  public ProductsController(ApiDbContext context, IBlobStorageService blobStorageService)
+  public ProductsController(
+    ApiDbContext context,
+    IBlobStorageService blobStorageService,
+    IProductMapper mapper)
   {
     _context = context;
     _blobStorageService = blobStorageService;
+    _mapper = mapper;
   }
 
   [HttpGet("me")]
@@ -44,23 +51,25 @@ public class ProductsController : ControllerBase
   }
 
   [HttpGet]
-  public async Task<IActionResult> GetAll()
+  public async Task<ActionResult<IEnumerable<ProductDto>>> GetAll()
   {
     var products = await _context.Products.ToListAsync();
-    return Ok(products);
+    var productDtos = _mapper.ToDto(products);
+    return Ok(productDtos);
   }
 
   [HttpGet("{userId}")]
-  public async Task<IActionResult> GetByUserId(int userId)
+  public async Task<ActionResult<IEnumerable<ProductDto>>> GetByUserId(int userId)
   {
     var products = await _context.Products
       .Where(p => p.UserId == userId)
       .ToListAsync();
-    return Ok(products);
+    var productDtos = _mapper.ToDto(products);
+    return Ok(productDtos);
   }
 
   [HttpGet("{userId}/{id}")]
-  public async Task<IActionResult> GetById(int userId, string id)
+  public async Task<ActionResult<ProductDto>> GetById(int userId, string id)
   {
     var product = await _context.Products
       .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
@@ -69,23 +78,37 @@ public class ProductsController : ControllerBase
     {
       return NotFound();
     }
-    return Ok(product);
+
+    var productDto = _mapper.ToDto(product);
+    return Ok(productDto);
   }
 
   [HttpPost]
-  public async Task<IActionResult> Create([FromBody] Product product)
+  public async Task<ActionResult<ProductDto>> Create([FromBody] CreateProductDto createDto)
   {
+    if (!ModelState.IsValid)
+    {
+      return BadRequest(ModelState);
+    }
+
+    var product = _mapper.ToEntity(createDto);
     product.Id = Guid.NewGuid().ToString();
 
     _context.Products.Add(product);
     await _context.SaveChangesAsync();
 
-    return CreatedAtAction(nameof(GetById), new { userId = product.UserId, id = product.Id }, product);
+    var productDto = _mapper.ToDto(product);
+    return CreatedAtAction(nameof(GetById), new { userId = product.UserId, id = product.Id }, productDto);
   }
 
   [HttpPut("{userId}/{id}")]
-  public async Task<IActionResult> Update(int userId, string id, [FromBody] Product product)
+  public async Task<ActionResult<ProductDto>> Update(int userId, string id, [FromBody] UpdateProductDto updateDto)
   {
+    if (!ModelState.IsValid)
+    {
+      return BadRequest(ModelState);
+    }
+
     var existingProduct = await _context.Products
       .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
 
@@ -94,14 +117,13 @@ public class ProductsController : ControllerBase
       return NotFound();
     }
 
-    // Update properties
-    existingProduct.Name = product.Name;
-    existingProduct.Price = product.Price;
-    existingProduct.ImageUrl = product.ImageUrl;
+    // Use mapper to update the entity
+    _mapper.UpdateEntity(existingProduct, updateDto);
 
     await _context.SaveChangesAsync();
 
-    return Ok(existingProduct);
+    var productDto = _mapper.ToDto(existingProduct);
+    return Ok(productDto);
   }
 
   [HttpDelete("{userId}/{id}")]

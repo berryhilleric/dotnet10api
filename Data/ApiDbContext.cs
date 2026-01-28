@@ -1,7 +1,7 @@
-using Api.Models;
+using Products.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace Api.Data;
+namespace Products.Data;
 
 public class ApiDbContext : DbContext
 {

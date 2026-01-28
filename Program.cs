@@ -1,5 +1,5 @@
-// Import custom services from the Api.Services namespace
-using Api.Services;
+// Import custom services from the Products.Services namespace
+using Products.Services;
 // Import Azure Identity library for authentication with Azure services
 using Azure.Identity;
 // Import JWT Bearer authentication for token-based auth
@@ -9,7 +9,9 @@ using Microsoft.Identity.Web;
 // Import Entity Framework Core for database operations
 using Microsoft.EntityFrameworkCore;
 // Import the DbContext for database access
-using Api.Data;
+using Products.Data;
+// Import mappers for converting between entities and DTOs
+using Products.Mappers;
 
 // Create a web application builder with command-line arguments
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +31,8 @@ builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 // Register CurrentUserService as scoped (one instance per request)
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+// Register ProductMapper as scoped (one instance per request)
+builder.Services.AddScoped<IProductMapper, ProductMapper>();
 
 // Configure JWT Bearer authentication as the default authentication scheme
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
