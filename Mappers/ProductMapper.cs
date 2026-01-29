@@ -69,8 +69,11 @@ public class ProductMapper : IProductMapper
     if (updateDto == null)
       throw new ArgumentNullException(nameof(updateDto));
 
-    product.Name = updateDto.Name;
-    product.Price = updateDto.Price;
-    product.ImageUrl = updateDto.ImageUrl;
+    if (updateDto.Name != null)
+      product.Name = updateDto.Name;
+    if (updateDto.Price.HasValue)
+      product.Price = updateDto.Price.Value;
+    if (updateDto.ImageUrl != null)
+      product.ImageUrl = updateDto.ImageUrl;
   }
 }

@@ -15,18 +15,15 @@ namespace Products.Controllers;
 [Authorize] // Requires valid JWT token
 public class ProductsController : ControllerBase
 {
-  private readonly ApiDbContext _context;
+  private readonly IProductService _productService;
   private readonly IBlobStorageService _blobStorageService;
-  private readonly IProductMapper _mapper;
 
   public ProductsController(
-    ApiDbContext context,
-    IBlobStorageService blobStorageService,
-    IProductMapper mapper)
+    IProductService productService,
+    IBlobStorageService blobStorageService)
   {
-    _context = context;
+    _productService = productService;
     _blobStorageService = blobStorageService;
-    _mapper = mapper;
   }
 
   [HttpGet("me")]
@@ -53,33 +50,27 @@ public class ProductsController : ControllerBase
   [HttpGet]
   public async Task<ActionResult<IEnumerable<ProductDto>>> GetAll()
   {
-    var products = await _context.Products.ToListAsync();
-    var productDtos = _mapper.ToDto(products);
+    var productDtos = await _productService.GetAllAsync();
     return Ok(productDtos);
   }
 
   [HttpGet("{userId}")]
   public async Task<ActionResult<IEnumerable<ProductDto>>> GetByUserId(int userId)
   {
-    var products = await _context.Products
-      .Where(p => p.UserId == userId)
-      .ToListAsync();
-    var productDtos = _mapper.ToDto(products);
-    return Ok(productDtos);
+    // Optionally, implement a GetByUserIdAsync in the service if needed
+    var allProducts = await _productService.GetAllAsync();
+    var userProducts = allProducts.Where(p => p.UserId == userId);
+    return Ok(userProducts);
   }
 
   [HttpGet("{userId}/{id}")]
   public async Task<ActionResult<ProductDto>> GetById(int userId, string id)
   {
-    var product = await _context.Products
-      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
-
-    if (product == null)
+    var productDto = await _productService.GetByIdAsync(id);
+    if (productDto == null || productDto.UserId != userId)
     {
       return NotFound();
     }
-
-    var productDto = _mapper.ToDto(product);
     return Ok(productDto);
   }
 
@@ -91,14 +82,8 @@ public class ProductsController : ControllerBase
       return BadRequest(ModelState);
     }
 
-    var product = _mapper.ToEntity(createDto);
-    product.Id = Guid.NewGuid().ToString();
-
-    _context.Products.Add(product);
-    await _context.SaveChangesAsync();
-
-    var productDto = _mapper.ToDto(product);
-    return CreatedAtAction(nameof(GetById), new { userId = product.UserId, id = product.Id }, productDto);
+    var productDto = await _productService.CreateAsync(createDto);
+    return CreatedAtAction(nameof(GetById), new { userId = productDto.UserId, id = productDto.Id }, productDto);
   }
 
   [HttpPut("{userId}/{id}")]
@@ -109,37 +94,23 @@ public class ProductsController : ControllerBase
       return BadRequest(ModelState);
     }
 
-    var existingProduct = await _context.Products
-      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
-
-    if (existingProduct == null)
+    var productDto = await _productService.UpdateAsync(id, updateDto);
+    if (productDto == null || productDto.UserId != userId)
     {
       return NotFound();
     }
-
-    // Use mapper to update the entity
-    _mapper.UpdateEntity(existingProduct, updateDto);
-
-    await _context.SaveChangesAsync();
-
-    var productDto = _mapper.ToDto(existingProduct);
     return Ok(productDto);
   }
 
   [HttpDelete("{userId}/{id}")]
   public async Task<IActionResult> Delete(int userId, string id)
   {
-    var product = await _context.Products
-      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
-
-    if (product == null)
+    var productDto = await _productService.GetByIdAsync(id);
+    if (productDto == null || productDto.UserId != userId)
     {
       return NotFound();
     }
-
-    _context.Products.Remove(product);
-    await _context.SaveChangesAsync();
-
+    await _productService.DeleteAsync(id);
     return NoContent();
   }
 
@@ -164,28 +135,31 @@ public class ProductsController : ControllerBase
       return BadRequest("Image size cannot exceed 5MB");
     }
 
-    // Get the product
-    var product = await _context.Products
-      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
-
-    if (product == null)
+    // Get the product via service
+    var productDto = await _productService.GetByIdAsync(id);
+    if (productDto == null || productDto.UserId != userId)
     {
       return NotFound("Product not found");
     }
 
     // Delete old image if exists
-    if (!string.IsNullOrEmpty(product.ImageUrl))
+    if (!string.IsNullOrEmpty(productDto.ImageUrl))
     {
-      await _blobStorageService.DeleteImageAsync(product.ImageUrl);
+      await _blobStorageService.DeleteImageAsync(productDto.ImageUrl);
     }
 
     // Upload new image
     using var stream = image.OpenReadStream();
     var imageUrl = await _blobStorageService.UploadImageAsync(stream, image.FileName, image.ContentType);
 
-    // Update product with new image URL
-    product.ImageUrl = imageUrl;
-    await _context.SaveChangesAsync();
+    // Update product with new image URL using service
+    var updateDto = new UpdateProductDto
+    {
+      Name = productDto.Name,
+      Price = productDto.Price,
+      ImageUrl = imageUrl
+    };
+    await _productService.UpdateAsync(id, updateDto);
 
     return Ok(new { imageUrl });
   }
@@ -193,19 +167,23 @@ public class ProductsController : ControllerBase
   [HttpDelete("{userId}/{id}/image")]
   public async Task<IActionResult> DeleteImage(int userId, string id)
   {
-    var product = await _context.Products
-      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
-
-    if (product == null)
+    var productDto = await _productService.GetByIdAsync(id);
+    if (productDto == null || productDto.UserId != userId)
     {
       return NotFound("Product not found");
     }
 
-    if (!string.IsNullOrEmpty(product.ImageUrl))
+    if (!string.IsNullOrEmpty(productDto.ImageUrl))
     {
-      await _blobStorageService.DeleteImageAsync(product.ImageUrl);
-      product.ImageUrl = null;
-      await _context.SaveChangesAsync();
+      await _blobStorageService.DeleteImageAsync(productDto.ImageUrl);
+      // Remove image URL from product
+      var updateDto = new UpdateProductDto
+      {
+        Name = productDto.Name,
+        Price = productDto.Price,
+        ImageUrl = null
+      };
+      await _productService.UpdateAsync(id, updateDto);
     }
 
     return NoContent();

@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Products.Data;
 // Import mappers for converting between entities and DTOs
 using Products.Mappers;
+using Products.Repositories;
 
 // Create a web application builder with command-line arguments
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +34,10 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 // Register ProductMapper as scoped (one instance per request)
 builder.Services.AddScoped<IProductMapper, ProductMapper>();
+
+// Register ProductRepository and ProductService in DI container
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductService, ProductService>();
 
 // Configure JWT Bearer authentication as the default authentication scheme
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
